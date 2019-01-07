@@ -18,6 +18,8 @@
  */
 package org.apache.fineract.portfolio.loanaccount.api;
 
+import java.io.IOException;
+import java.net.MalformedURLException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -47,6 +49,7 @@ import org.apache.fineract.infrastructure.core.serialization.DefaultToApiJsonSer
 import org.apache.fineract.infrastructure.core.service.DateUtils;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
 import org.apache.fineract.portfolio.loanaccount.data.LoanTransactionData;
+import org.apache.fineract.portfolio.loanaccount.exception.ReceiptNumberExistException;
 import org.apache.fineract.portfolio.loanaccount.service.LoanReadPlatformService;
 import org.apache.fineract.portfolio.paymenttype.data.PaymentTypeData;
 import org.apache.fineract.portfolio.paymenttype.service.PaymentTypeReadPlatformService;
@@ -54,6 +57,11 @@ import org.joda.time.LocalDate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonSyntaxException;
 
 @Path("/loans/{loanId}/transactions")
 @Component
@@ -168,14 +176,32 @@ public class LoanTransactionsApiResource {
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_JSON })
     public String executeLoanTransaction(@PathParam("loanId") final Long loanId, @QueryParam("command") final String commandParam,
-            final String apiRequestBodyAsJson) {
+            final String apiRequestBodyAsJson) throws JsonSyntaxException, MalformedURLException, IOException {
 
         final CommandWrapperBuilder builder = new CommandWrapperBuilder().withJson(apiRequestBodyAsJson);
 
         CommandProcessingResult result = null;
         if (is(commandParam, "repayment")) {
-            final CommandWrapper commandRequest = builder.loanRepaymentTransaction(loanId).build();
-            result = this.commandsSourceWritePlatformService.logCommandSource(commandRequest);
+            //{"paymentTypeId":1,"transactionAmount":720,"transactionDate":"01 December 2018","locale":"en","dateFormat":"dd MMMM yyyy","accountNumber":"878uysdcw","checkNumber":"wiroufiwrf","routingCode":"wrkh","bankNumber":"vmnbvn","receiptNumber":"nvjvj"}
+            BuildOptions a = new BuildOptions();
+        	JsonParser ps = new JsonParser();
+        	JsonElement js = ps.parse(apiRequestBodyAsJson);
+        	JsonObject jsonObject = js.getAsJsonObject();
+        	JsonElement r = jsonObject.get("receiptNumber");  	 
+			
+				 JsonParser p = new JsonParser();
+		         	JsonElement j = p.parse(a.checkReceipt(r.toString()));
+		         	JsonObject job = j.getAsJsonObject();
+		         	 JsonElement resp = job.get("success");
+		         		    if (resp.getAsBoolean() == false) { throw new ReceiptNumberExistException(r.toString()); }
+		         		    else {
+		        	
+		
+			
+			 final CommandWrapper commandRequest = builder.loanRepaymentTransaction(loanId).build();
+	            result = this.commandsSourceWritePlatformService.logCommandSource(commandRequest);
+		         		    }
+         	 	
         } else if (is(commandParam, "waiveinterest")) {
             final CommandWrapper commandRequest = builder.waiveInterestPortionTransaction(loanId).build();
             result = this.commandsSourceWritePlatformService.logCommandSource(commandRequest);
@@ -207,6 +233,7 @@ public class LoanTransactionsApiResource {
         return this.toApiJsonSerializer.serialize(result);
     }
 
+    
     @POST
     @Path("{transactionId}")
     @Consumes({ MediaType.APPLICATION_JSON })

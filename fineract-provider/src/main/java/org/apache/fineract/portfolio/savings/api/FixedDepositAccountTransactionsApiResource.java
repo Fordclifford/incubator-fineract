@@ -18,6 +18,8 @@
  */
 package org.apache.fineract.portfolio.savings.api;
 
+import java.io.IOException;
+import java.net.MalformedURLException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -44,6 +46,8 @@ import org.apache.fineract.infrastructure.core.exception.UnrecognizedQueryParamE
 import org.apache.fineract.infrastructure.core.serialization.ApiRequestJsonSerializationSettings;
 import org.apache.fineract.infrastructure.core.serialization.DefaultToApiJsonSerializer;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
+import org.apache.fineract.portfolio.loanaccount.api.BuildOptions;
+import org.apache.fineract.portfolio.loanaccount.exception.ReceiptNumberExistException;
 import org.apache.fineract.portfolio.paymenttype.data.PaymentTypeData;
 import org.apache.fineract.portfolio.paymenttype.service.PaymentTypeReadPlatformService;
 import org.apache.fineract.portfolio.savings.DepositAccountType;
@@ -54,6 +58,11 @@ import org.apache.fineract.portfolio.savings.service.SavingsAccountReadPlatformS
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonSyntaxException;
 
 @Path("/fixeddepositaccounts/{fixedDepositAccountId}/transactions")
 @Component
@@ -137,15 +146,32 @@ public class FixedDepositAccountTransactionsApiResource {
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_JSON })
     public String transaction(@PathParam("fixedDepositAccountId") final Long fixedDepositAccountId,
-            @QueryParam("command") final String commandParam, final String apiRequestBodyAsJson) {
+            @QueryParam("command") final String commandParam, final String apiRequestBodyAsJson) throws JsonSyntaxException, MalformedURLException, IOException {
 
         final CommandWrapperBuilder builder = new CommandWrapperBuilder().withJson(apiRequestBodyAsJson);
 
         CommandProcessingResult result = null;
 
         if (is(commandParam, "deposit")) {
+        	
+            BuildOptions a = new BuildOptions();
+        	JsonParser ps = new JsonParser();
+        	JsonElement js = ps.parse(apiRequestBodyAsJson);
+        	JsonObject jsonObject = js.getAsJsonObject();
+        	JsonElement r = jsonObject.get("receiptNumber");  	
+        	System.out.println("hey there");
+        	System.out.println(r);
+			
+				 JsonParser p = new JsonParser();
+		         	JsonElement j = p.parse(a.checkReceipt(r.toString()));
+		         	JsonObject job = j.getAsJsonObject();
+		         	 JsonElement resp = job.get("success");
+		         	 System.out.println(resp);
+		         		    if (resp.getAsBoolean() == false) { throw new ReceiptNumberExistException(r.toString()); }
+		         		    else {
             final CommandWrapper commandRequest = builder.fixedDepositAccountDeposit(fixedDepositAccountId).build();
             result = this.commandsSourceWritePlatformService.logCommandSource(commandRequest);
+		         		    }
         } else if (is(commandParam, "withdrawal")) {
             final CommandWrapper commandRequest = builder.fixedDepositAccountWithdrawal(fixedDepositAccountId).build();
             result = this.commandsSourceWritePlatformService.logCommandSource(commandRequest);

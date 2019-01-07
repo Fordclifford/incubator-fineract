@@ -20,8 +20,12 @@ package org.apache.fineract.portfolio.loanaccount.api;
 
 import static org.apache.fineract.portfolio.loanproduct.service.LoanEnumerations.interestType;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.net.MalformedURLException;
 import java.util.*;
+import com.google.gson.*;
+
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -123,8 +127,6 @@ import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
-import com.google.gson.JsonElement;
-
 @Path("/loans")
 @Component
 @Scope("singleton")
@@ -150,8 +152,8 @@ public class LoansApiResource {
 
     private final Set<String> LOAN_APPROVAL_DATA_PARAMETERS = new HashSet<>(Arrays.asList("approvalDate", "approvalAmount"));
     private final String resourceNameForPermissions = "LOAN";
-
-    private final PlatformSecurityContext context;
+    
+     private final PlatformSecurityContext context;
     private final LoanReadPlatformService loanReadPlatformService;
     private final LoanProductReadPlatformService loanProductReadPlatformService;
     private final LoanDropdownReadPlatformService dropdownReadPlatformService;
@@ -671,12 +673,57 @@ public class LoansApiResource {
             final ApiRequestJsonSerializationSettings settings = this.apiRequestParameterHelper.process(uriInfo.getQueryParameters());
             return this.loanScheduleToApiJsonSerializer.serialize(settings, loanSchedule.toData(), new HashSet<String>());
         }
-
+        
         final CommandWrapper commandRequest = new CommandWrapperBuilder().createLoanApplication().withJson(apiRequestBodyAsJson).build();
 
         final CommandProcessingResult result = this.commandsSourceWritePlatformService.logCommandSource(commandRequest);
+       // {"clientId":"3","productId":2,"disbursementData":[],"principal":10000,"loanTermFrequency":6,"loanTermFrequencyType":0,"numberOfRepayments":6,"repaymentEvery":1,"repaymentFrequencyType":0,"interestRatePerPeriod":15,"amortizationType":1,"isEqualAmortization":true,"interestType":0,"interestCalculationPeriodType":1,"allowPartialPeriodInterestCalcualtion":false,"graceOnArrearsAgeing":30,"transactionProcessingStrategyId":1,"locale":"en","dateFormat":"dd MMMM yyyy","loanType":"individual","expectedDisbursementDate":"27 November 2018","submittedOnDate":"27 November 2018"}
+      
+        	 JsonParser ps = new JsonParser();
+             JsonElement tree = ps.parse(apiRequestBodyAsJson);
+      	    JsonObject object = tree.getAsJsonObject();
+      	  object.remove("clientId");
+      	object.addProperty("clientId", "782");  
+      	String apiRequestBodyAsJson1 = object.toString();
+      	 
+      	 // 	System.out.println(apiRequestBodyAsJson1);
+			
+			final CommandWrapper commandRequest1 = new CommandWrapperBuilder().createLoanApplication().withJson(apiRequestBodyAsJson1).build();
 
-        return this.toApiJsonSerializer.serialize(result);
+	       final CommandProcessingResult result1 = this.commandsSourceWritePlatformService.logCommandSource(commandRequest1);
+	      		
+        JsonParser parser = new JsonParser();
+       JsonElement ttree = parser.parse(apiRequestBodyAsJson);
+	    JsonObject tobject = ttree.getAsJsonObject();
+	    JsonElement clientId = tobject.get("clientId");
+	    JsonElement principal = tobject.get("principal");
+	    JsonElement submittedOnDate = tobject.get("submittedOnDate");
+	    
+	    	    try {
+	    	BuildOptions ap = new BuildOptions();
+			JsonElement jtree = parser.parse(ap.getDetails(clientId));
+			JsonObject jobject =jtree.getAsJsonObject();
+		    JsonElement displayName = jobject.get("displayName");
+		    JsonElement mobileNo = jobject.get("mobileNo");
+		    String test = mobileNo.getAsString();
+		    String mobile = "+"+test;
+		   
+		      String[] phone = new String[] {"\""+mobile+"\""};	 
+		      ap.sendText(phone,"Dear "+displayName.getAsString()+", your loan application of KES. "+ principal.getAsString()+" has been received on "+submittedOnDate.getAsString());
+		  	
+		    
+		} catch (JsonSyntaxException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		} catch (MalformedURLException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+	    
+        return this.toApiJsonSerializer.serialize(result)+"/n"+this.toApiJsonSerializer.serialize(result1);
     }
 
     @PUT
@@ -710,12 +757,13 @@ public class LoansApiResource {
     @Path("{loanId}")
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_JSON })
-    public String stateTransitions(@PathParam("loanId") final Long loanId, @QueryParam("command") final String commandParam,
-            final String apiRequestBodyAsJson) {
+    public String stateTransitions(@PathParam("loanId")  Long loanId, @QueryParam("command") final String commandParam,
+             String apiRequestBodyAsJson) {
 
         final CommandWrapperBuilder builder = new CommandWrapperBuilder().withJson(apiRequestBodyAsJson);
 
         CommandProcessingResult result = null;
+        
 
         if (is(commandParam, "reject")) {
             final CommandWrapper commandRequest = builder.rejectLoanApplication(loanId).build();
@@ -723,12 +771,79 @@ public class LoansApiResource {
         } else if (is(commandParam, "withdrawnByApplicant")) {
             final CommandWrapper commandRequest = builder.withdrawLoanApplication(loanId).build();
             result = this.commandsSourceWritePlatformService.logCommandSource(commandRequest);
-        } else if (is(commandParam, "approve")) {
+        }  if (is(commandParam, "approve")) {
             final CommandWrapper commandRequest = builder.approveLoanApplication(loanId).build();
-            result = this.commandsSourceWritePlatformService.logCommandSource(commandRequest);
-        } else if (is(commandParam, "disburse")) {
+            
+            
+            //{"approvedOnDate":"28 November 2018","approvedLoanAmount":10000,"expectedDisbursementDate":"28 November 2018","disbursementData":[],"locale":"en","dateFormat":"dd MMMM yyyy"}
+            try {
+            	BuildOptions a = new BuildOptions();
+            	JsonParser ps = new JsonParser();
+            	JsonElement js = ps.parse(apiRequestBodyAsJson);
+            	JsonObject jsonObject = js.getAsJsonObject();
+            	 JsonElement approvedLoanAmount = jsonObject.get("approvedLoanAmount");
+            	 JsonElement approvedOnDate = jsonObject.get("approvedOnDate");
+
+
+            	 JsonParser p = new JsonParser();
+             	
+            	 JsonElement jTree = p.parse(a.getClient(loanId));
+         	    JsonObject jObject = jTree.getAsJsonObject();
+         	    JsonElement displayName = jObject.get("displayName");
+         	
+         		a.sendMessage(loanId,"Dear "+displayName.getAsString()+", your loan of KES. "+approvedLoanAmount.getAsDouble()+"  has been approved on "+approvedOnDate.getAsString()+". Please await disbursal confirmation.");
+         		
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+         result = this.commandsSourceWritePlatformService.logCommandSource(commandRequest);
+            
+    }  if (is(commandParam, "disburse")) {
             final CommandWrapper commandRequest = builder.disburseLoanApplication(loanId).build();
             result = this.commandsSourceWritePlatformService.logCommandSource(commandRequest);
+            try {
+            	//System.out.println(apiRequestBodyAsJson);
+            	BuildOptions api = new BuildOptions();
+            	JsonParser ps = new JsonParser();
+            	JsonElement js = ps.parse(apiRequestBodyAsJson);
+            	JsonObject jsonObject = js.getAsJsonObject();
+            	 JsonElement transactionAmount = jsonObject.get("transactionAmount");
+            	 JsonElement actualDisbursementDate = jsonObject.get("actualDisbursementDate");
+            	 
+            	System.out.println(ps.parse(api.getPayment(loanId)));
+            	JsonElement j = ps.parse(api.getPayment(loanId));
+            	JsonObject obj = j.getAsJsonObject();            	
+            	 JsonElement interest = obj.get("interestAmount");
+            	 JsonElement principal = obj.get("principalAmount");
+            	 Double repay = interest.getAsDouble()+principal.getAsDouble();
+            	 System.out.println(repay);
+
+            	 JsonParser p = new JsonParser();
+            	
+            	 JsonElement jTree = p.parse(api.getClient(loanId));
+         	    JsonObject jObject = jTree.getAsJsonObject();
+         	    JsonElement displayName = jObject.get("displayName");
+         	    
+         	   JsonParser parser = new JsonParser();
+         	    JsonElement jsonTree = parser.parse(api.getClient(loanId));
+         	    JsonObject jsonOject = jsonTree.getAsJsonObject();
+         	    JsonElement mobileNo = jsonOject.get("mobileNo");
+         	        String test = mobileNo.getAsString();
+         	        String mobile = "+"+test;
+         	        //System.out.println(mobile);
+         	       JsonElement jtree = parser.parse(api.getPaymentUrl(repay, mobile, "LoanAccount"));
+            	    JsonObject ject = jtree.getAsJsonObject();
+            	    JsonElement url = ject.get("mobileNo");        	    
+         	        
+         	        	  
+         	    
+         	  api.sendMessage(loanId,"Dear "+displayName.getAsString()+", your loan of KES. "+ transactionAmount.getAsDouble()+" has been disbursed on " +actualDisbursementDate.getAsString()+". Please contact your sales agent to collect your asset. Start paying KES. "+repay+" daily on the url. "+url);
+    			
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
         } else if (is(commandParam, "disburseToSavings")) {
             final CommandWrapper commandRequest = builder.disburseLoanToSavingsApplication(loanId).build();
             result = this.commandsSourceWritePlatformService.logCommandSource(commandRequest);

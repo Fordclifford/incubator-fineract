@@ -18,6 +18,8 @@
  */
 package org.apache.fineract.portfolio.savings.api;
 
+import java.io.IOException;
+import java.net.MalformedURLException;
 import java.util.Collection;
 
 import javax.ws.rs.Consumes;
@@ -42,6 +44,8 @@ import org.apache.fineract.infrastructure.core.exception.UnrecognizedQueryParamE
 import org.apache.fineract.infrastructure.core.serialization.ApiRequestJsonSerializationSettings;
 import org.apache.fineract.infrastructure.core.serialization.DefaultToApiJsonSerializer;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
+import org.apache.fineract.portfolio.loanaccount.api.BuildOptions;
+import org.apache.fineract.portfolio.loanaccount.exception.ReceiptNumberExistException;
 import org.apache.fineract.portfolio.paymenttype.data.PaymentTypeData;
 import org.apache.fineract.portfolio.paymenttype.service.PaymentTypeReadPlatformService;
 import org.apache.fineract.portfolio.savings.DepositAccountType;
@@ -53,6 +57,11 @@ import org.springframework.context.annotation.Scope;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonSyntaxException;
 
 @Path("/savingsaccounts/{savingsId}/transactions")
 @Component
@@ -131,14 +140,28 @@ public class SavingsAccountTransactionsApiResource {
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_JSON })
     public String transaction(@PathParam("savingsId") final Long savingsId, @QueryParam("command") final String commandParam,
-            final String apiRequestBodyAsJson) {
+            final String apiRequestBodyAsJson) throws JsonSyntaxException, MalformedURLException, IOException {
         try {
             final CommandWrapperBuilder builder = new CommandWrapperBuilder().withJson(apiRequestBodyAsJson);
 
             CommandProcessingResult result = null;
             if (is(commandParam, "deposit")) {
+            	 BuildOptions a = new BuildOptions();
+             	JsonParser ps = new JsonParser();
+             	JsonElement js = ps.parse(apiRequestBodyAsJson);
+             	JsonObject jsonObject = js.getAsJsonObject();
+             	JsonElement r = jsonObject.get("receiptNumber");  	
+             	
+     				 JsonParser p = new JsonParser();
+     		         	JsonElement j = p.parse(a.checkReceipt(r.toString()));
+     		         	JsonObject job = j.getAsJsonObject();
+     		         	 JsonElement resp = job.get("success");
+     		         		    if (resp.getAsBoolean() == false) { throw new ReceiptNumberExistException(r.toString()); }
+     		         		    else {
+                 
                 final CommandWrapper commandRequest = builder.savingsAccountDeposit(savingsId).build();
                 result = this.commandsSourceWritePlatformService.logCommandSource(commandRequest);
+     		         		    }
             } else if (is(commandParam, "withdrawal")) {
                 final CommandWrapper commandRequest = builder.savingsAccountWithdrawal(savingsId).build();
                 result = this.commandsSourceWritePlatformService.logCommandSource(commandRequest);

@@ -324,6 +324,7 @@ public class CommandWrapper {
     public String commandName() {
         return this.actionName + "_" + this.entityName;
     }
+    
 
     public boolean isLoanDisburseDetailResource() {
         return this.entityName.equalsIgnoreCase("DISBURSEMENTDETAIL");
