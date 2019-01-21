@@ -204,7 +204,7 @@ String output =  br.readLine();
 }
 
 public  void sendText(String[] phone,String message) throws MalformedURLException, IOException{
-    String postUrl        = "http://localhost:9090/city/api/sms/send";
+    String postUrl        = "http://localhost:9091/sms/sms";
 
 
 try {
@@ -213,9 +213,13 @@ HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 conn.setDoOutput(true);
 conn.setRequestMethod("POST");
 conn.setRequestProperty("Content-Type", "application/json");
+conn.setRequestProperty("Fineract-Platform-TenantId", "city");
+conn.setRequestProperty("Fineract-Tenant-App-Key", "1d26dbbc-e7ef-47ec-8a8d-6a919c93d5ed");
        //getClient(loanId);
       
-       String input = "{\"phone\":"+Arrays.toString(phone)+",\"message\":\""+message+"\"}";
+      // String input = "{\"phone\":"+Arrays.toString(phone)+",\"message\":\""+message+"\"}";
+       
+       String input = "[{\"internalId\":\"55\",\"mobileNumber\":"+Arrays.toString(phone)+",\"message\":\""+message+"\",\"providerId\":\"2\"}]";
      //  System.out.println(Arrays.toString(phone));
 
 OutputStream os = conn.getOutputStream();
